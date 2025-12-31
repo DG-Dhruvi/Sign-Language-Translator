@@ -1,33 +1,32 @@
 const URL = "https://teachablemachine.withgoogle.com/models/nuaRlSR6k/";
-let model, webcam, labelContainer, maxPredictions;
 
+let model, webcam, labelContainer, maxPredictions;
 let sentence = "";
 let isRunning = false;
 let isPaused = false;
 
-let confidenceThreshold = 0.70;
-let holdTimeFrames = 15;
-let stableDetection = "";
-let stableCount = 0;
+// ===== OPTIMIZATION VARIABLES =====
+let confidenceThreshold = 0.75;
+let WINDOW_SIZE = 8;
+let predictionWindow = [];
+let lastAddedChar = "";
+let cooldownFrames = 20;
+let cooldownCounter = 0;
 
-function updateThreshold(value) {
-    confidenceThreshold = value / 100;
-    document.getElementById("threshold-value").textContent = value + "%";
+function updateThreshold(val) {
+    confidenceThreshold = val / 100;
+    document.getElementById("threshold-value").textContent = val + "%";
 }
 
-function updateHoldTime(value) {
-    holdTimeFrames = parseInt(value);
-    document.getElementById("hold-time-value").textContent =
-        (value / 10).toFixed(1) + "s";
+function updateHoldTime(val) {
+    WINDOW_SIZE = parseInt(val);
+    document.getElementById("hold-time-value").textContent = val + " frames";
 }
 
 async function init() {
     if (isRunning) return;
 
-    const modelURL = URL + "model.json";
-    const metadataURL = URL + "metadata.json";
-
-    model = await tmImage.load(modelURL, metadataURL);
+    model = await tmImage.load(URL + "model.json", URL + "metadata.json");
     maxPredictions = model.getTotalClasses();
 
     webcam = new tmImage.Webcam(400, 400, true);
@@ -42,10 +41,7 @@ async function init() {
         labelContainer.appendChild(document.createElement("div"));
     }
 
-    document.getElementById("pause-btn").disabled = false;
-    document.getElementById("add-space-btn").disabled = false;
-    document.getElementById("clear-btn").disabled = false;
-    document.getElementById("speak-btn").disabled = false;
+    document.querySelectorAll("button").forEach(b => b.disabled = false);
     document.getElementById("start-btn").disabled = true;
     document.getElementById("mode-indicator").style.display = "inline-block";
 
@@ -63,37 +59,58 @@ async function loop() {
 async function predict() {
     const prediction = await model.predict(webcam.canvas);
 
-    let maxProb = 0;
-    let detected = "";
+    let bestClass = "";
+    let bestProb = 0;
 
     prediction.forEach((p, i) => {
         labelContainer.childNodes[i].innerHTML =
             `${p.className}: ${(p.probability * 100).toFixed(1)}%`;
-        if (p.probability > maxProb) {
-            maxProb = p.probability;
-            detected = p.className;
+
+        if (p.probability > bestProb) {
+            bestProb = p.probability;
+            bestClass = p.className;
         }
     });
 
-    if (maxProb > confidenceThreshold && !isPaused) {
-        if (detected === stableDetection) {
-            stableCount++;
-            if (stableCount === holdTimeFrames) {
-                sentence += detected;
-                document.getElementById("sentence-display").textContent = sentence;
-                stableDetection = "";
-                stableCount = 0;
-            }
-        } else {
-            stableDetection = detected;
-            stableCount = 1;
-        }
-        document.getElementById("current-detection").textContent = detected;
+    if (bestProb < confidenceThreshold || isPaused) {
+        predictionWindow = [];
+        return;
+    }
+
+    document.getElementById("current-detection").textContent = bestClass;
+
+    if (cooldownCounter > 0) {
+        cooldownCounter--;
+        return;
+    }
+
+    predictionWindow.push(bestClass);
+    if (predictionWindow.length > WINDOW_SIZE) {
+        predictionWindow.shift();
+    }
+
+    const counts = {};
+    predictionWindow.forEach(c => counts[c] = (counts[c] || 0) + 1);
+
+    const [winner, freq] =
+        Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+
+    if (freq >= WINDOW_SIZE * 0.75 && winner !== lastAddedChar) {
+        sentence += winner;
+        document.getElementById("sentence-display").textContent = sentence;
+
+        lastAddedChar = winner;
+        predictionWindow = [];
+        cooldownCounter = cooldownFrames;
     }
 }
 
 function togglePause() {
     isPaused = !isPaused;
+    const indicator = document.getElementById("mode-indicator");
+    indicator.textContent = isPaused ? "Paused" : "Auto-Adding";
+    indicator.className = "mode-indicator " +
+        (isPaused ? "mode-paused" : "mode-active");
 }
 
 function addSpace() {
@@ -103,11 +120,11 @@ function addSpace() {
 
 function clearSentence() {
     sentence = "";
+    lastAddedChar = "";
     document.getElementById("sentence-display").textContent = "";
 }
 
 function speakSentence() {
     if (!sentence.trim()) return;
-    const utterance = new SpeechSynthesisUtterance(sentence);
-    speechSynthesis.speak(utterance);
+    speechSynthesis.speak(new SpeechSynthesisUtterance(sentence));
 }
