@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Language to Speech</title>
+
+    <link rel="stylesheet" href="styles.css">
+
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+</head>
+
+<body>
+<div class="container">
+    <h1>Sign Language to Speech</h1>
+
+    <div class="controls">
+        <button id="start-btn" onclick="init()">Start Camera</button>
+        <button id="pause-btn" onclick="togglePause()" disabled>Pause</button>
+        <button id="add-space-btn" onclick="addSpace()" disabled>Add Space</button>
+        <button id="clear-btn" onclick="clearSentence()" disabled>Clear</button>
+        <button id="speak-btn" onclick="speakSentence()" disabled> Speak</button>
+    </div>
+
+    <div id="webcam-container"></div>
+
+    <div class="prediction-section">
+        <h2>
+            Current Detection:
+            <span id="mode-indicator" class="mode-indicator mode-active" style="display:none;">
+                Auto-Adding
+            </span>
+        </h2>
+        <div id="current-detection">Press Start</div>
+        <div id="label-container"></div>
+    </div>
+
+    <div class="sentence-section">
+        <h2>Your Sentence</h2>
+        <div id="sentence-display"></div>
+    </div>
+
+    <div class="settings">
+        <h3> Settings</h3>
+
+        <label>
+            Confidence Threshold:
+            <span id="threshold-value">75%</span>
+        </label>
+        <input type="range" min="60" max="95" value="75"
+               oninput="updateThreshold(this.value)">
+
+        <label>
+            Hold Time:
+            <span id="hold-time-value">8 frames</span>
+        </label>
+        <input type="range" min="5" max="15" value="8"
+               oninput="updateHoldTime(this.value)">
+    </div>
+
+    <div class="status" id="status">Ready</div>
+</div>
+
+<script src="main.js"></script>
+</body>
+</html>
