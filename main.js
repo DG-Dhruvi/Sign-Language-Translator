@@ -5,7 +5,6 @@ let sentence = "";
 let isRunning = false;
 let isPaused = false;
 
-// ===== OPTIMIZATION VARIABLES =====
 let confidenceThreshold = 0.75;
 let WINDOW_SIZE = 8;
 let predictionWindow = [];
